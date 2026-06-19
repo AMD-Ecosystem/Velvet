@@ -182,7 +182,11 @@ namespace Velvet
 		size_t m_numBytes = 0;
 		T* m_buffer = nullptr;
 		T* m_bufferCPU = nullptr;
+#if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
+		hipGraphicsResource* m_cudaVboResource = nullptr;
+#else
 		struct cudaGraphicsResource* m_cudaVboResource = nullptr;
+#endif
 	};
 
 	template <class T>

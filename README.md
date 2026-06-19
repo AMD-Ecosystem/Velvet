@@ -53,6 +53,24 @@ If you want to build from source by yourself, dependencies can be installed usin
 ./vcpkg.exe install imgui[core, opengl3-binding, glfw-binding]:x64-windows
 ```
 
+### Building for AMD GPUs (ROCm/HIP)
+
+Velvet also builds for AMD GPUs with ROCm/HIP through CMake. The same dependencies are available from vcpkg using the `x64-linux` triplet:
+
+```bash
+./vcpkg install glfw3 glad fmt glm assimp "imgui[core,opengl3-binding,glfw-binding]" --triplet x64-linux
+```
+
+Then configure with `USE_HIP=ON`, selecting your GPU architecture with `CMAKE_HIP_ARCHITECTURES` (for example `gfx1100` or `gfx1201`):
+
+```bash
+cmake -B build -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1100 \
+      -DCMAKE_TOOLCHAIN_FILE=<path-to-vcpkg>/scripts/buildsystems/vcpkg.cmake
+cmake --build build -j
+```
+
+Velvet renders with OpenGL and shares buffers with the GPU, so it needs an AMD GPU with a graphics pipeline (RDNA, such as the Radeon RX 7000/9000 series). Compute-only datacenter GPUs (CDNA, such as the Instinct MI series) cannot create the OpenGL context Velvet requires.
+
 ## Implementation Details
 
 In computer graphics, building your own wheel can often be unevitable. But what fears most is that sometimes you don't even have recipe for the wheel you want to build. There are lots of great paper describing their methods, but many of the implementation details are left out or scattered across the internet.
