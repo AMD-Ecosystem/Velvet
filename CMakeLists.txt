@@ -34,10 +34,9 @@ if(USE_HIP)
 endif()
 
 # Host/GPU sources. Upstream keeps these as .cpp (built by MSVC) plus the two
-# .cu files (built by nvcc) in Velvet.vcxproj; that layout is preserved here.
-# The .cpp files include device code through Common.cuh, so the HIP build below
-# compiles them as HIP via LANGUAGE without renaming, leaving the Visual Studio
-# CUDA build (which references the .cpp names) intact.
+# .cu files (built by nvcc) in Velvet.vcxproj; that layout is preserved here,
+# and the AMD build below keeps the same split: the .cu files carry every
+# kernel and every launch, the .cpp files are host code.
 set(CPP_SOURCES
   Velvet/Actor.cpp
   Velvet/Component.cpp
@@ -61,11 +60,31 @@ set(SOURCES ${CPP_SOURCES} ${CU_SOURCES})
 add_executable(Velvet ${SOURCES})
 
 if(USE_HIP)
-  # Compile every source as HIP. A mixed CXX/HIP target would apply the HIP
-  # arch flags to the .cpp sources as plain C++ and fail, so mark them all HIP.
-  set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE HIP)
+  # Only the device-code sources are HIP translation units. The host .cpp files
+  # must stay C++: the GPU compiler defines __HIPCC__, and Common.hpp keys
+  # HOST_INIT() off that macro to drop the default member initializers of
+  # VtSimParams (a __device__ __constant__ copy of it cannot be dynamically
+  # initialized). Compiling the host files as GPU sources therefore zeroed the
+  # host copy of the simulation parameters too, so the solver ran with zero
+  # substeps and zero gravity. This mirrors the NVIDIA build, where the .cpp
+  # files are plain C++ and never see __CUDACC__.
+  set_source_files_properties(${CU_SOURCES} PROPERTIES LANGUAGE HIP)
   target_compile_definitions(Velvet PRIVATE USE_HIP)
-  target_link_libraries(Velvet PRIVATE hip::hipcub roc::rocthrust)
+  # hipCUB and rocThrust are header only, but their imported targets pull in
+  # hip::device, whose interface appends "-x hip --offload-arch=..." to every
+  # C++ source of the consuming target. That is what makes a mixed-language
+  # target fail; take their header search paths instead, and link only
+  # hip::host, for the runtime library and __HIP_PLATFORM_AMD__.
+  foreach(rocm_target hip::hipcub roc::rocthrust roc::rocprim_hip)
+    if(TARGET ${rocm_target})
+      get_target_property(rocm_target_includes ${rocm_target}
+        INTERFACE_INCLUDE_DIRECTORIES)
+      if(rocm_target_includes)
+        target_include_directories(Velvet SYSTEM PRIVATE ${rocm_target_includes})
+      endif()
+    endif()
+  endforeach()
+  target_link_libraries(Velvet PRIVATE hip::host)
   set_target_properties(Velvet PROPERTIES
     HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}"
   )
