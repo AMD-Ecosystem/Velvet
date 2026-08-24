@@ -8,6 +8,9 @@
 
 #if defined(USE_HIP) || defined(__HIP_PLATFORM_AMD__)
 
+#include <cstdio>
+#include <cstdlib>
+
 #include <hip/hip_runtime.h>
 #include <hip/hip_gl_interop.h>
 
@@ -47,25 +50,33 @@
 #define cudaGraphicsUnregisterResource     hipGraphicsUnregisterResource
 #define cudaGraphicsRegisterFlagsNone      hipGraphicsRegisterFlagsNone
 
-// checkCudaErrors macro for HIP
-#ifndef checkCudaErrors
-#define checkCudaErrors(val) __checkCudaErrors((val), #val, __FILE__, __LINE__)
-
-template <typename T>
-void __checkCudaErrors(T result, const char *const func, const char *const file,
-                       int const line) {
-  if (result != hipSuccess) {
-    fprintf(stderr, "HIP error at %s:%d code=%d(%s) \"%s\" \n", file, line,
-            static_cast<unsigned int>(result), hipGetErrorName(result), func);
-    exit(EXIT_FAILURE);
-  }
+// Status check for the call sites that spell it checkCudaErrors(). The CUDA
+// build gets that macro from the CUDA samples helper header; the HIP build
+// uses this instead, so no CUDA samples header is on the AMD include path.
+namespace Velvet
+{
+	inline void AbortOnHipError(hipError_t status, const char* expr,
+		const char* file, int line)
+	{
+		if (status == hipSuccess)
+		{
+			return;
+		}
+		std::fprintf(stderr, "%s:%d: %s -> %s (%d)\n", file, line, expr,
+			hipGetErrorString(status), static_cast<int>(status));
+		std::exit(EXIT_FAILURE);
+	}
 }
+
+#ifndef checkCudaErrors
+#define checkCudaErrors(expr) \
+	::Velvet::AbortOnHipError((expr), #expr, __FILE__, __LINE__)
 #endif
 
 #else  // CUDA path
 
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
-#include <helper_cuda.h>
+#include <helper_cuda.h>  // checkCudaErrors, from Velvet/External/cuda
 
 #endif

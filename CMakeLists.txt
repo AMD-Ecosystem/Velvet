@@ -77,8 +77,16 @@ endif()
 target_include_directories(Velvet PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/Velvet
   ${CMAKE_CURRENT_SOURCE_DIR}/Velvet/External
-  ${CMAKE_CURRENT_SOURCE_DIR}/Velvet/External/cuda
 )
+
+if(NOT USE_HIP)
+  # The bundled CUDA samples helpers are for the CUDA build only. The HIP build
+  # defines checkCudaErrors itself in Velvet/cuda_to_hip.h and never puts this
+  # directory on the include path.
+  target_include_directories(Velvet PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Velvet/External/cuda
+  )
+endif()
 
 # Link libraries
 target_link_libraries(Velvet PRIVATE
