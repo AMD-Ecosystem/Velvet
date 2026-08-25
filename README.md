@@ -61,10 +61,14 @@ Velvet also builds for AMD GPUs with ROCm/HIP through CMake. The same dependenci
 ./vcpkg install glfw3 glad fmt glm assimp "imgui[core,opengl3-binding,glfw-binding]" --triplet x64-linux
 ```
 
-Then configure with `USE_HIP=ON`, selecting your GPU architecture with `CMAKE_HIP_ARCHITECTURES` (for example `gfx1100` or `gfx1201`):
+Then configure with `USE_HIP=ON`, selecting your GPU architecture with `CMAKE_HIP_ARCHITECTURES` (for example `gfx1100` or `gfx1201`). Only the two `.cu` files are compiled as HIP, but the plain C++ sources reach the hipCUB, rocThrust and HIP runtime headers through `Velvet/Common.cuh`, so the ROCm clang is required for `CMAKE_CXX_COMPILER` as well as for `CMAKE_HIP_COMPILER`. This is the invocation the ROCm build is verified with, where `ROCM_PATH` is your ROCm installation prefix (`/opt/rocm` by default):
 
 ```bash
 cmake -B build -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1100 \
+      -DCMAKE_C_COMPILER=$ROCM_PATH/lib/llvm/bin/clang \
+      -DCMAKE_CXX_COMPILER=$ROCM_PATH/lib/llvm/bin/clang++ \
+      -DCMAKE_HIP_COMPILER=$ROCM_PATH/lib/llvm/bin/clang++ \
+      -DCMAKE_PREFIX_PATH=$ROCM_PATH \
       -DCMAKE_TOOLCHAIN_FILE=<path-to-vcpkg>/scripts/buildsystems/vcpkg.cmake
 cmake --build build -j
 ```
